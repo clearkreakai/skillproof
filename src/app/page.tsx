@@ -46,12 +46,14 @@ export default function Home() {
               </div>
               <span className="font-semibold text-xl text-gray-900 dark:text-white">SkillProof</span>
             </div>
-            <a
-              href="#waitlist"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              Join Waitlist
-            </a>
+            <div className="flex items-center gap-3">
+              <a
+                href="/assess"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Try It Now
+              </a>
+            </div>
           </div>
         </div>
       </nav>
@@ -59,9 +61,9 @@ export default function Home() {
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium mb-8">
-            <span className="w-2 h-2 bg-blue-600 rounded-full mr-2 animate-pulse"></span>
-            Coming Soon
+          <div className="inline-flex items-center px-3 py-1 rounded-full bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-medium mb-8">
+            <span className="w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse"></span>
+            Now in Beta
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white leading-tight mb-6">
             Resumes show where you&apos;ve been.
@@ -71,28 +73,49 @@ export default function Home() {
             In the AI age, credentials mean less. Proven skills mean everything.
             Generate custom assessments from real job postings and prove you can do the work.
           </p>
-          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              required
-              className="flex-1 px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <button
-              type="submit"
-              disabled={status === 'loading'}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors whitespace-nowrap"
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <a
+              href="/assess"
+              className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-lg flex items-center gap-2"
             >
-              {status === 'loading' ? 'Joining...' : 'Get Early Access'}
-            </button>
-          </form>
-          {message && (
-            <p className={`mt-4 text-sm ${status === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-              {message}
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Try It Now — Free
+            </a>
+          </div>
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+            No signup required. Generate your first assessment in seconds.
+          </p>
+          
+          {/* Email signup for updates */}
+          <div className="mt-12 p-6 bg-gray-50 dark:bg-slate-800 rounded-xl max-w-md mx-auto">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+              Get updates on new features:
             </p>
-          )}
+            <form onSubmit={handleSubmit} className="flex gap-2">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                required
+                className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <button
+                type="submit"
+                disabled={status === 'loading'}
+                className="px-4 py-2 bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 text-white dark:text-gray-900 font-medium rounded-lg transition-colors text-sm whitespace-nowrap"
+              >
+                {status === 'loading' ? '...' : 'Subscribe'}
+              </button>
+            </form>
+            {message && (
+              <p className={`mt-2 text-xs ${status === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                {message}
+              </p>
+            )}
+          </div>
         </div>
       </section>
 
