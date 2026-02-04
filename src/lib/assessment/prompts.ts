@@ -175,15 +175,9 @@ FOR EACH QUESTION, PROVIDE:
 
 6. **Skills Tested**: Array of specific skills this measures
 
-7. **Scoring Rubric**:
-   - dimensions: Array of {name, weight, description} (weights sum to 1)
-   - levels: For each dimension, what does 1-5 look like?
-   - redFlags: Instant disqualifiers
-   - bonusIndicators: Signs of exceptional thinking
+7. **Why This Matters**: 1 sentence on why this skill matters for the role
 
-8. **Why This Matters**: 2-3 sentences on why this skill matters for the role
-
-9. **What Great Looks Like**: Brief description of an excellent response
+8. **What Great Looks Like**: 1 sentence describing an excellent response
 
 QUESTION TYPE GUIDANCE:
 
@@ -241,32 +235,16 @@ FORMAT YOUR RESPONSE AS JSON:
         "stakes": "What's at risk..."
       },
       "prompt": "The actual question/instruction",
-      "parts": null or [{"id": "p1", "prompt": "..."}, ...] for multi-part,
-      "expectedFormat": "short_text|long_text|email|slack|bullet_list|structured",
-      "wordGuidance": {"min": 50, "max": 200} or null,
+      "expectedFormat": "long_text",
       "timeGuidance": 3,
       "skillsTested": ["skill1", "skill2"],
-      "rubric": {
-        "dimensions": [
-          {"name": "relevance|judgment|communication|execution|company_fit", "weight": 0.3, "description": "..."}
-        ],
-        "levels": {
-          "relevance": [
-            {"score": 5, "label": "excellent", "description": "...", "indicators": ["...", "..."]},
-            {"score": 4, "label": "good", "description": "...", "indicators": ["..."]},
-            {"score": 3, "label": "adequate", "description": "...", "indicators": ["..."]},
-            {"score": 2, "label": "weak", "description": "...", "indicators": ["..."]},
-            {"score": 1, "label": "poor", "description": "...", "indicators": ["..."]}
-          ]
-        },
-        "redFlags": ["flag1", "flag2"],
-        "bonusIndicators": ["bonus1", "bonus2"]
-      },
-      "whyThisMatters": "Why this skill matters for the role...",
-      "whatGreatLooksLike": "Description of excellent response..."
+      "whyThisMatters": "Why this skill matters...",
+      "whatGreatLooksLike": "What a great answer includes..."
     }
   ]
 }
+
+IMPORTANT: Keep the JSON simple. Do not add extra nested objects or arrays beyond what's shown above.
 
 QUALITY CHECKS BEFORE FINALIZING:
 1. Could someone pass this with a generic, polished answer? If yes, make it more specific.
