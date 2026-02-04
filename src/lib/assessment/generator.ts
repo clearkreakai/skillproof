@@ -165,7 +165,44 @@ async function generateAssessmentFromResearch(
       };
     }
     
-    const parsed = JSON.parse(jsonMatch[0]);
+    // Try to repair common JSON issues from LLM output
+    let jsonStr = jsonMatch[0];
+    
+    // Fix trailing commas before ] or }
+    jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
+    
+    // Fix missing commas between array elements (common LLM mistake)
+    jsonStr = jsonStr.replace(/"\s*\n\s*"/g, '",\n"');
+    jsonStr = jsonStr.replace(/}\s*\n\s*{/g, '},\n{');
+    
+    // Try to balance brackets if truncated
+    const openBraces = (jsonStr.match(/{/g) || []).length;
+    const closeBraces = (jsonStr.match(/}/g) || []).length;
+    const openBrackets = (jsonStr.match(/\[/g) || []).length;
+    const closeBrackets = (jsonStr.match(/]/g) || []).length;
+    
+    // Add missing closing brackets/braces
+    for (let i = 0; i < openBrackets - closeBrackets; i++) {
+      jsonStr += ']';
+    }
+    for (let i = 0; i < openBraces - closeBraces; i++) {
+      jsonStr += '}';
+    }
+    
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Raw response (first 1000 chars):', textBlock.text.substring(0, 1000));
+      return {
+        success: false,
+        error: { 
+          code: 'GENERATION_FAILED', 
+          message: 'AI returned malformed response. Please try again.' 
+        },
+      };
+    }
     
     // Validate and transform questions
     const questions: AssessmentQuestion[] = (parsed.questions || []).map(
