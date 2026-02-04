@@ -218,7 +218,7 @@ We're looking for a Senior Product Manager to lead our payments team. You'll be 
                       {progressMessages[progressIndex].text}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      This usually takes 10-20 seconds
+                      This usually takes 30-60 seconds
                     </p>
                   </div>
                 </div>
