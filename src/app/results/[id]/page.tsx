@@ -45,8 +45,10 @@ interface AssessmentInfo {
   questions: QuestionData[];
 }
 
-export default function ResultsPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ResultsPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
+  // Handle both Promise and direct object (Next.js version compatibility)
+  const resolvedParams = params instanceof Promise ? use(params) : params;
+  const { id } = resolvedParams;
   
   const [result, setResult] = useState<ResultData | null>(null);
   const [assessment, setAssessment] = useState<AssessmentInfo | null>(null);

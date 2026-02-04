@@ -23,8 +23,10 @@ interface SavedResponse {
   timeSpentSeconds: number;
 }
 
-export default function TakeAssessmentPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function TakeAssessmentPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
+  // Handle both Promise and direct object (Next.js version compatibility)
+  const resolvedParams = params instanceof Promise ? use(params) : params;
+  const { id } = resolvedParams;
   const router = useRouter();
   
   const [assessment, setAssessment] = useState<AssessmentData | null>(null);
