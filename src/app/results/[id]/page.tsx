@@ -30,7 +30,7 @@ interface ResultData {
   areasForGrowth: string[];
   totalTimeSeconds: number;
   questionScores: QuestionScore[];
-  skillAnalysis: {
+  skillAnalysis?: {
     skillScores: Array<{ skill: string; score: number; questions: number }>;
     strongestSkills: string[];
     weakestSkills: string[];
@@ -314,7 +314,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
           </div>
 
           {/* Skills Breakdown */}
-          {result.skillAnalysis.skillScores.length > 0 && (
+          {result.skillAnalysis && result.skillAnalysis.skillScores.length > 0 && (
             <div className="card p-6 sm:p-8 mb-10 animate-fade-in-up animation-delay-400">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                 <span className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">

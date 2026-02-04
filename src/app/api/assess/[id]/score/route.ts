@@ -62,8 +62,18 @@ export async function POST(
     // Analyze skills
     const skillAnalysis = analyzeSkills(result, assessment);
 
-    // Save the result
-    const savedId = await saveResult(assessmentId, responseId, result);
+    // Add skillAnalysis to result before saving
+    const resultWithSkills = {
+      ...result,
+      skillAnalysis: {
+        skillScores: skillAnalysis.skillScores,
+        strongestSkills: skillAnalysis.strongestSkills,
+        weakestSkills: skillAnalysis.weakestSkills,
+      },
+    };
+
+    // Save the result (with skillAnalysis included)
+    const savedId = await saveResult(assessmentId, responseId, resultWithSkills);
     
     if (!savedId) {
       console.warn('Failed to save result to database');
