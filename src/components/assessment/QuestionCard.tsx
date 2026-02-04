@@ -100,14 +100,18 @@ export function QuestionCard({
           Scenario
         </div>
         
-        <p className="text-gray-800 dark:text-gray-200 font-medium mb-3 text-lg">
-          {question.context.role}
-        </p>
-        <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-          {question.context.situation}
-        </p>
+        {question.context?.role && (
+          <p className="text-gray-800 dark:text-gray-200 font-medium mb-3 text-lg">
+            {question.context.role}
+          </p>
+        )}
+        {question.context?.situation && (
+          <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+            {question.context.situation}
+          </p>
+        )}
         
-        {question.context.constraints.length > 0 && (
+        {question.context?.constraints && question.context.constraints.length > 0 && (
           <div className="mt-4 p-4 bg-white/60 dark:bg-slate-800/60 rounded-xl border border-gray-200/50 dark:border-slate-600/50">
             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 font-semibold mb-2">
               <span className="text-amber-500">⚠️</span>
@@ -124,7 +128,7 @@ export function QuestionCard({
           </div>
         )}
 
-        {question.context.stakes && (
+        {question.context?.stakes && (
           <div className="mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl border border-amber-200/50 dark:border-amber-700/50">
             <div className="flex items-center gap-2">
               <span className="text-lg">🎯</span>
@@ -135,7 +139,7 @@ export function QuestionCard({
           </div>
         )}
 
-        {question.context.additionalInfo && Object.keys(question.context.additionalInfo).length > 0 && (
+        {question.context?.additionalInfo && Object.keys(question.context.additionalInfo).length > 0 && (
           <div className="mt-4 p-4 bg-gray-100/80 dark:bg-slate-700/80 rounded-xl">
             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 font-semibold mb-2">
               <span>📊</span>
