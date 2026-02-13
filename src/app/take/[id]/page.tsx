@@ -34,14 +34,20 @@ export default function TakeAssessmentPage() {
         if (!res.ok) {
           throw new Error('Assessment not found');
         }
-        const data = await res.json();
+        const json = await res.json();
+        const data = json.assessment || json; // Handle both wrapped and unwrapped responses
+        
+        // Handle both nested objects and flat strings for company/role
+        const companyName = typeof data.company === 'string' ? data.company : data.company?.name || 'Company';
+        const roleName = typeof data.role === 'string' ? data.role : data.role?.title || 'Role';
+        
         setAssessment({
           id: data.id,
-          title: data.title || `${data.role?.title} Assessment`,
-          description: data.description || `Skills assessment for ${data.role?.title} at ${data.company?.name}`,
-          company: data.company?.name || 'Company',
-          role: data.role?.title || 'Role',
-          questionCount: data.questions?.length || 8,
+          title: data.title || `${roleName} Assessment`,
+          description: data.description || `Skills assessment for ${roleName} at ${companyName}`,
+          company: companyName,
+          role: roleName,
+          questionCount: data.questionCount || data.questions?.length || 8,
           estimatedMinutes: data.estimatedMinutes || 20,
         });
         setStatus('ready');
