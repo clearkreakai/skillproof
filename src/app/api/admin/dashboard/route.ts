@@ -67,6 +67,13 @@ export async function GET() {
       const resultData = result.result_data as {
         overallScore?: number;
         candidateName?: string;
+        candidateEmail?: string;
+        tracking?: {
+          totalPasteEvents?: number;
+          totalTabSwitches?: number;
+          pasteEvents?: { questionIndex: number }[];
+          tabSwitches?: { type: string }[];
+        };
       } | null;
       
       // Handle the assessments relation - could be object or array depending on Supabase response
@@ -76,6 +83,12 @@ export async function GET() {
         ? assessmentsRaw[0] 
         : assessmentsRaw;
 
+      // Extract tracking summary
+      const tracking = resultData?.tracking;
+      const pasteCount = tracking?.totalPasteEvents ?? tracking?.pasteEvents?.length ?? 0;
+      const tabSwitchCount = tracking?.totalTabSwitches ?? 
+        (tracking?.tabSwitches?.filter(e => e.type === 'blur')?.length ?? 0);
+
       return {
         id: result.id,
         created_at: result.created_at,
@@ -84,6 +97,9 @@ export async function GET() {
         role_title: assessmentInfo?.role_title || 'Unknown',
         overall_score: resultData?.overallScore || 0,
         candidate_name: resultData?.candidateName,
+        candidate_email: resultData?.candidateEmail,
+        paste_count: pasteCount,
+        tab_switch_count: tabSwitchCount,
       };
     });
 

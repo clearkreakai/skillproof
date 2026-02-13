@@ -211,9 +211,19 @@ export async function completeAssessment(responseId: string): Promise<boolean> {
 export async function saveResult(
   assessmentId: string,
   responseId: string,
-  result: AssessmentResult
+  result: AssessmentResult,
+  candidateInfo?: { name: string; email: string },
+  trackingData?: Record<string, unknown>
 ): Promise<string | null> {
   const shareToken = Math.random().toString(36).substring(2, 15);
+  
+  // Merge candidate info and tracking into result_data
+  const resultWithMeta = {
+    ...result,
+    candidateName: candidateInfo?.name,
+    candidateEmail: candidateInfo?.email,
+    tracking: trackingData,
+  };
   
   const { data, error } = await supabase
     .from('results')
@@ -221,7 +231,7 @@ export async function saveResult(
       id: result.id,
       assessment_id: assessmentId,
       response_id: responseId,
-      result_data: result,
+      result_data: resultWithMeta,
       share_token: shareToken,
     })
     .select('id')

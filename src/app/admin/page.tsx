@@ -21,6 +21,9 @@ interface ResultSummary {
   role_title: string;
   overall_score: number;
   candidate_name?: string;
+  candidate_email?: string;
+  paste_count?: number;
+  tab_switch_count?: number;
 }
 
 export default function AdminDashboard() {
@@ -196,23 +199,26 @@ export default function AdminDashboard() {
           </div>
         ) : activeTab === 'results' ? (
           /* Results Table */
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Company
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Candidate
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Role
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Score
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Flags
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -220,28 +226,51 @@ export default function AdminDashboard() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {results.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
                       No results yet. Candidates will appear here once they complete assessments.
                     </td>
                   </tr>
                 ) : (
                   results.map((result) => (
                     <tr key={result.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(result.created_at)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {result.company_name}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {result.candidate_name || 'Anonymous'}
+                        </div>
+                        {result.candidate_email && (
+                          <div className="text-xs text-gray-500">{result.candidate_email}</div>
+                        )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {result.role_title}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{result.role_title}</div>
+                        <div className="text-xs text-gray-500">{result.company_name}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-full text-sm font-medium ${getScoreColor(result.overall_score)}`}>
                           {result.overall_score}%
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm">
+                        <div className="flex gap-2">
+                          {(result.paste_count ?? 0) > 0 && (
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs" title={`${result.paste_count} paste events`}>
+                              📋 {result.paste_count}
+                            </span>
+                          )}
+                          {(result.tab_switch_count ?? 0) > 0 && (
+                            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs" title={`${result.tab_switch_count} tab switches`}>
+                              🔀 {result.tab_switch_count}
+                            </span>
+                          )}
+                          {(result.paste_count ?? 0) === 0 && (result.tab_switch_count ?? 0) === 0 && (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm">
                         <Link
                           href={`/results/${result.id}`}
                           className="text-blue-600 hover:text-blue-800 font-medium"
