@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import Hotjar from "@/components/analytics/Hotjar";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -9,18 +10,18 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "SkillProof - Prove What You Can Do",
-  description: "Resumes show where you've been. SkillProof shows what you can do. Generate custom skills assessments based on real job requirements and stand out from the crowd.",
-  keywords: ["skills assessment", "job application", "hiring", "career", "job seekers", "prove your skills", "interview prep", "career change"],
+  title: "Mettle - Prove What You Can Do",
+  description: "Resumes show where you've been. Mettle shows what you can do. Generate custom skills assessments based on real job requirements and stand out from the crowd.",
+  keywords: ["skills assessment", "job application", "hiring", "career", "job seekers", "prove your skills", "interview prep", "career change", "mettle"],
   authors: [{ name: "ClearKreak" }],
   creator: "ClearKreak",
-  publisher: "SkillProof",
-  metadataBase: new URL("https://skillproof.io"),
+  publisher: "Mettle",
+  metadataBase: new URL("https://getmettle.io"),
   openGraph: {
-    title: "SkillProof - Prove What You Can Do",
-    description: "Resumes show where you've been. SkillProof shows what you can do. Generate custom skills assessments based on real job requirements.",
-    url: "https://skillproof.io",
-    siteName: "SkillProof",
+    title: "Mettle - Prove What You Can Do",
+    description: "Resumes show where you've been. Mettle shows what you can do. Generate custom skills assessments based on real job requirements.",
+    url: "https://getmettle.io",
+    siteName: "Mettle",
     type: "website",
     locale: "en_US",
     images: [
@@ -28,14 +29,14 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "SkillProof - Prove What You Can Do",
+        alt: "Mettle - Prove What You Can Do",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "SkillProof - Prove What You Can Do",
-    description: "Resumes show where you've been. SkillProof shows what you can do.",
+    title: "Mettle - Prove What You Can Do",
+    description: "Resumes show where you've been. Mettle shows what you can do.",
     images: ["/og-image.png"],
   },
   robots: {
@@ -75,6 +76,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`scroll-smooth ${inter.variable}`}>
       <body className={`${inter.className} antialiased min-h-screen bg-white dark:bg-slate-950 text-gray-900 dark:text-gray-100`}>
+        <Hotjar />
         {children}
       </body>
     </html>

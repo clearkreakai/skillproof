@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAssessment } from '@/lib/assessment';
 import { saveAssessment } from '@/lib/db';
+import { getUser } from '@/lib/supabase-server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,6 +27,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get the logged-in user (optional - assessments work for anonymous users too)
+    const user = await getUser();
+
     // Generate the assessment
     const result = await generateAssessment({
       jobDescription,
@@ -42,8 +46,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Save to database
-    const saved = await saveAssessment(result.data, jobDescription);
+    // Save to database (with user_id if logged in)
+    const saved = await saveAssessment(result.data, jobDescription, user?.id);
     
     if (!saved) {
       // Still return the assessment even if save fails

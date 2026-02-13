@@ -4,24 +4,128 @@ import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import type { AssessmentQuestion } from '@/lib/assessment/types';
 
+/**
+ * Parse and format situation text to improve readability
+ * Detects data patterns and structures them
+ */
+function formatSituationText(text: string): React.ReactNode {
+  if (!text) return null;
+
+  // Check if text contains data patterns (percentages, months, metrics)
+  const hasDataPatterns = /\d+%|\d+\/\d+|Month \d|Q[1-4]|Year \d|\$[\d,]+/i.test(text);
+  
+  if (!hasDataPatterns) {
+    // Simple text - just improve line breaks
+    return <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{text}</p>;
+  }
+
+  // Split into sentences for better processing
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  const introSentences: string[] = [];
+  const dataSentences: string[] = [];
+  const closingSentences: string[] = [];
+  
+  let foundData = false;
+  let dataEnded = false;
+  
+  sentences.forEach(sentence => {
+    const hasData = /\d+%|\d+\/\d+|Month \d|Q[1-4]|\$[\d,]+/.test(sentence);
+    
+    if (!foundData && !hasData) {
+      introSentences.push(sentence);
+    } else if (hasData) {
+      foundData = true;
+      dataSentences.push(sentence);
+    } else if (foundData && !hasData) {
+      dataEnded = true;
+      closingSentences.push(sentence);
+    } else if (dataEnded) {
+      closingSentences.push(sentence);
+    }
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* Intro */}
+      {introSentences.length > 0 && (
+        <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+          {introSentences.join(' ')}
+        </p>
+      )}
+      
+      {/* Data Section */}
+      {dataSentences.length > 0 && (
+        <div className="p-4 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-gray-200 dark:border-slate-600">
+          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Key Data
+          </div>
+          <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed space-y-2">
+            {dataSentences.map((sentence, idx) => {
+              // Highlight percentages, dollar amounts, and numbered references like (1), (2), etc.
+              const highlighted = sentence
+                // Numbered task/section references - bold and highlighted
+                .replace(
+                  /\((\d+)\)/g,
+                  '<span class="inline-flex items-center justify-center w-6 h-6 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 text-xs font-bold rounded-full mx-1">$1</span>'
+                )
+                // Percentages and dollar amounts - blue highlight
+                .replace(
+                  /(\d+%|\$[\d,]+(?:\.\d+)?)/g,
+                  '<mark class="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-1 rounded font-semibold">$1</mark>'
+                );
+              return (
+                <p 
+                  key={idx} 
+                  dangerouslySetInnerHTML={{ __html: highlighted }}
+                  className="pb-2 border-b border-gray-100 dark:border-slate-700 last:border-0 last:pb-0"
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+      
+      {/* Closing */}
+      {closingSentences.length > 0 && (
+        <p className="text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
+          {closingSentences.join(' ')}
+        </p>
+      )}
+    </div>
+  );
+}
+
 interface QuestionCardProps {
   question: AssessmentQuestion;
   questionNumber: number;
+  totalQuestions?: number;
   initialResponse?: string;
   onResponseChange: (response: string) => void;
   onTimeUpdate?: (seconds: number) => void;
+  onPasteDetected?: (pasteInfo: { pasted: boolean; pastedLength: number; totalLength: number }) => void;
+  onNext?: () => void;
+  isLastQuestion?: boolean;
 }
 
 export function QuestionCard({
   question,
   questionNumber,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  totalQuestions,
   initialResponse = '',
   onResponseChange,
   onTimeUpdate,
+  onPasteDetected,
+  onNext,
+  isLastQuestion = false,
 }: QuestionCardProps) {
   const [response, setResponse] = useState(initialResponse);
   const [startTime] = useState(Date.now());
   const [isFocused, setIsFocused] = useState(false);
+  const [pastedContentLength, setPastedContentLength] = useState(0);
 
   // Track time spent
   useEffect(() => {
@@ -40,6 +144,26 @@ export function QuestionCard({
     setResponse(value);
     onResponseChange(value);
   }, [onResponseChange]);
+
+  // Handle paste detection
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedText = e.clipboardData.getData('text');
+    if (pastedText && pastedText.length > 10) { // Only track meaningful pastes
+      const newPastedLength = pastedContentLength + pastedText.length;
+      setPastedContentLength(newPastedLength);
+      
+      // Report paste info after a small delay to get updated response length
+      setTimeout(() => {
+        if (onPasteDetected) {
+          onPasteDetected({
+            pasted: true,
+            pastedLength: newPastedLength,
+            totalLength: response.length + pastedText.length,
+          });
+        }
+      }, 100);
+    }
+  }, [pastedContentLength, response.length, onPasteDetected]);
 
   // Update when initial response changes (navigation)
   useEffect(() => {
@@ -106,35 +230,54 @@ export function QuestionCard({
           </p>
         )}
         {question.context?.situation && (
-          <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-            {question.context.situation}
-          </p>
+          <div className="situation-content">
+            {formatSituationText(question.context.situation)}
+          </div>
         )}
         
         {question.context?.constraints && question.context.constraints.length > 0 && (
-          <div className="mt-4 p-4 bg-white/60 dark:bg-slate-800/60 rounded-xl border border-gray-200/50 dark:border-slate-600/50">
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 font-semibold mb-2">
-              <span className="text-amber-500">⚠️</span>
-              Constraints to Consider
+          <div className="mt-6 p-5 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-800/80 rounded-2xl border-2 border-slate-200 dark:border-slate-600 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center shadow-md">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <span className="text-base font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wide">
+                Constraints
+              </span>
             </div>
-            <ul className="space-y-1.5">
+            <div className="grid gap-2">
               {question.context.constraints.map((constraint, idx) => (
-                <li key={idx} className="text-sm text-gray-600 dark:text-gray-400 flex items-start gap-2">
-                  <span className="text-gray-400 mt-0.5">•</span>
-                  {constraint}
-                </li>
+                <div key={idx} className="flex items-start gap-3 p-3 bg-white dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-600">
+                  <span className="flex-shrink-0 w-6 h-6 bg-slate-200 dark:bg-slate-600 rounded-full flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300">
+                    {idx + 1}
+                  </span>
+                  <span className="text-sm text-slate-700 dark:text-slate-200 font-medium leading-relaxed">
+                    {constraint}
+                  </span>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
 
         {question.context?.stakes && (
-          <div className="mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl border border-amber-200/50 dark:border-amber-700/50">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🎯</span>
-              <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">
-                Stakes: {question.context.stakes}
-              </span>
+          <div className="mt-4 p-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl shadow-lg shadow-red-500/20">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-xs font-bold text-white/80 uppercase tracking-wider mb-1">
+                  What&apos;s at Stake
+                </div>
+                <p className="text-white font-semibold leading-relaxed">
+                  {question.context.stakes}
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -196,6 +339,7 @@ export function QuestionCard({
             onChange={(e) => handleChange(e.target.value)}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
+            onPaste={handlePaste}
             placeholder={
               question.expectedFormat === 'email' 
                 ? 'Write your email here...\n\nStart with a subject line, then compose your message.' 
@@ -217,10 +361,6 @@ export function QuestionCard({
             )}
           />
 
-          {/* Character/word guidance - subtle footer */}
-          <div className="absolute bottom-3 right-3 text-xs text-gray-400 dark:text-gray-500">
-            {minWords}-{maxWords} words recommended
-          </div>
         </div>
         
         {/* Format hint */}
@@ -233,33 +373,43 @@ export function QuestionCard({
           </div>
         )}
 
-        {/* Progress indicator */}
-        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-700">
-          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-            <span>
-              {wordStatus === 'good' ? (
-                <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  Good response length
-                </span>
-              ) : wordStatus === 'short' && response.length > 0 ? (
-                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  Add more detail ({minWords - wordCount} more words)
-                </span>
-              ) : (
-                <span className="text-gray-400 dark:text-gray-500">Your response auto-saves</span>
-              )}
-            </span>
-            <span className="text-gray-400">
-              Press Tab to skip to navigation
-            </span>
-          </div>
+        {/* Auto-save indicator */}
+        <div className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+          Your response auto-saves
         </div>
+
+        {/* Next/Continue Button */}
+        {onNext && (
+          <div className="mt-6 pt-6 border-t border-gray-100 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={onNext}
+              disabled={response.trim().length === 0}
+              className={cn(
+                "w-full py-4 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-3",
+                response.trim().length > 0
+                  ? "bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/25 hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]"
+                  : "bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+              )}
+            >
+              {isLastQuestion ? (
+                <>
+                  Review & Submit
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </>
+              ) : (
+                <>
+                  Continue to Question {questionNumber + 1}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

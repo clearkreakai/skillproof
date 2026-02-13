@@ -56,6 +56,10 @@ export async function scoreResponse(
   try {
     const client = getAnthropicClient();
 
+    // TODO: Integrate token tracking
+    // After response, add:
+    //   import { trackUsage } from '@/lib/tokenTracking';
+    //   await trackUsage(aiResponse, 'score_response', assessmentId, { questionId: question.id });
     const aiResponse = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2000,
@@ -117,8 +121,13 @@ export async function scoreResponse(
 function transformDimensionScore(raw: Record<string, unknown>): DimensionScore {
   const score = (raw.score as number) || 3;
   const weight = (raw.weight as number) || 0.2;
+  // Valid dimensions including technical_proficiency for tools questions
+  const validDimensions = ['relevance', 'judgment', 'communication', 'execution', 'company_fit', 'technical_proficiency'];
+  const dimension = validDimensions.includes(raw.dimension as string) 
+    ? (raw.dimension as DimensionScore['dimension']) 
+    : 'relevance';
   return {
-    dimension: (raw.dimension as DimensionScore['dimension']) || 'relevance',
+    dimension,
     score,
     weight,
     weightedScore: (raw.weightedScore as number) || score * weight || 0.6,
@@ -148,13 +157,31 @@ function calculateOverallScore(dimensionScores: DimensionScore[]): number {
 // ============================================================================
 
 /**
+ * Helper to process items in batches with concurrency control
+ */
+async function processBatched<T, R>(
+  items: T[],
+  batchSize: number,
+  processor: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(processor));
+    results.push(...batchResults);
+  }
+  
+  return results;
+}
+
+/**
  * Score an entire assessment
  */
 export async function scoreAssessment(
   assessment: Assessment,
   responses: QuestionResponse[]
 ): Promise<Result<AssessmentResult>> {
-  const questionScores: QuestionScore[] = [];
   const startedAt = responses.length > 0 
     ? responses.reduce((earliest, r) => 
         r.startedAt < earliest ? r.startedAt : earliest, 
@@ -169,33 +196,39 @@ export async function scoreAssessment(
       )
     : new Date();
 
-  // Score each response
-  for (const question of assessment.questions) {
+  // Prepare scoring tasks for all questions
+  const scoringTasks = assessment.questions.map((question) => {
     const response = responses.find((r) => r.questionId === question.id);
-    
-    if (!response) {
-      // Unanswered question gets lowest score
-      questionScores.push(createEmptyScore(question.id, 'Question not answered'));
-      continue;
-    }
+    return { question, response };
+  });
 
-    // Score this response
-    const scoreResult = await scoreResponse(
-      question,
-      response,
-      assessment.role.title,
-      assessment.company.name
-    );
+  // Score questions in parallel batches (4 concurrent to respect rate limits)
+  const BATCH_SIZE = 4;
+  const questionScores = await processBatched(
+    scoringTasks,
+    BATCH_SIZE,
+    async ({ question, response }) => {
+      if (!response) {
+        // Unanswered question gets lowest score
+        return createEmptyScore(question.id, 'Question not answered');
+      }
 
-    if (scoreResult.success) {
-      questionScores.push(scoreResult.data);
-    } else {
-      // Scoring failed, use fallback
-      questionScores.push(
-        createEmptyScore(question.id, 'Unable to score response')
+      // Score this response
+      const scoreResult = await scoreResponse(
+        question,
+        response,
+        assessment.role.title,
+        assessment.company.name
       );
+
+      if (scoreResult.success) {
+        return scoreResult.data;
+      } else {
+        // Scoring failed, use fallback
+        return createEmptyScore(question.id, 'Unable to score response');
+      }
     }
-  }
+  );
 
   // Calculate overall score (0-100)
   const overallScore = calculateAssessmentScore(questionScores);
@@ -321,6 +354,10 @@ async function generateSummary(
   try {
     const client = getAnthropicClient();
 
+    // TODO: Integrate token tracking
+    // After response, add:
+    //   import { trackUsage } from '@/lib/tokenTracking';
+    //   await trackUsage(response, 'generate_summary', assessmentId);
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1500,

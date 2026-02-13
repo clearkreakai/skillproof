@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import Header from '@/components/Header';
 
 const progressMessages = [
   { text: 'Analyzing job description...', icon: '🔍' },
@@ -13,14 +13,31 @@ const progressMessages = [
   { text: 'Finalizing your assessment...', icon: '✨' },
 ];
 
+const focusAreaOptions = [
+  { id: 'technical', label: 'Technical Skills' },
+  { id: 'problem-solving', label: 'Problem Solving & Decision Making' },
+  { id: 'communication', label: 'Communication & Collaboration' },
+  { id: 'strategic', label: 'Strategic Thinking' },
+  { id: 'leadership', label: 'Leadership & Management' },
+];
+
+const questionCountOptions = [
+  { count: 8, label: 'Quick' },
+  { count: 12, label: 'Standard' },
+  { count: 16, label: 'In-Depth' },
+];
+
 export default function AssessStartPage() {
   const router = useRouter();
   const [jobDescription, setJobDescription] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [companyWebsite, setCompanyWebsite] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [error, setError] = useState('');
   const [progressIndex, setProgressIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -56,6 +73,7 @@ export default function AssessStartPage() {
         body: JSON.stringify({
           jobDescription,
           companyName: companyName || undefined,
+          companyWebsite: companyWebsite || undefined,
           questionCount: 8,
         }),
       });
@@ -86,18 +104,7 @@ export default function AssessStartPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl z-50 border-b border-gray-100 dark:border-slate-800">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-                <span className="text-white font-bold text-sm">SP</span>
-              </div>
-              <span className="font-semibold text-xl text-gray-900 dark:text-white">SkillProof</span>
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <Header />
 
       <main className="relative pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className={`max-w-2xl mx-auto transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
@@ -170,6 +177,140 @@ We're looking for a Senior Product Manager to lead our payments team. You'll be 
               </p>
             </div>
 
+            {/* Company Website (Optional) */}
+            <div className="card p-6">
+              <label 
+                htmlFor="companyWebsite" 
+                className="block text-sm font-semibold text-gray-900 dark:text-white mb-2"
+              >
+                Company Website <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                id="companyWebsite"
+                type="url"
+                value={companyWebsite}
+                onChange={(e) => setCompanyWebsite(e.target.value)}
+                placeholder="e.g., https://stripe.com"
+                disabled={status === 'loading'}
+                className="w-full px-4 py-3 border border-gray-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 transition-all"
+              />
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                Helps us identify the right company, especially for common names
+              </p>
+            </div>
+
+            {/* Customize Assessment (Collapsible) */}
+            <div className="card overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setCustomizeOpen(!customizeOpen)}
+                className="w-full p-6 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                  <span className="font-semibold text-gray-900 dark:text-white">Customize Assessment</span>
+                  <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-full">Premium</span>
+                </div>
+                <svg 
+                  className={`w-5 h-5 text-gray-400 transition-transform ${customizeOpen ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {customizeOpen && (
+                <div className="px-6 pb-6 space-y-6 border-t border-gray-100 dark:border-slate-700">
+                  {/* Focus Areas */}
+                  <div className="pt-6">
+                    <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                      Focus Areas <span className="text-gray-400 font-normal">(select up to 2)</span>
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {focusAreaOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => setShowPremiumModal(true)}
+                          className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group"
+                        >
+                          <div className="w-5 h-5 rounded border-2 border-gray-300 dark:border-slate-500 group-hover:border-blue-500 flex items-center justify-center transition-colors">
+                          </div>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">{option.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Question Count */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                      Assessment Length
+                    </label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {questionCountOptions.map((option) => (
+                        <button
+                          key={option.count}
+                          type="button"
+                          onClick={() => setShowPremiumModal(true)}
+                          className={`p-4 rounded-xl border-2 transition-all text-center ${
+                            option.count === 8
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                              : 'border-gray-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-500'
+                          }`}
+                        >
+                          <div className="text-2xl font-bold text-gray-900 dark:text-white">{option.count}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{option.label}</div>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      More questions provide deeper skill analysis
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Premium Modal */}
+            {showPremiumModal && (
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowPremiumModal(false)}>
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Premium Feature</h3>
+                    <p className="text-gray-600 dark:text-gray-300 mb-6">
+                      Customize your assessment with focus areas and extended question counts. Upgrade to Premium to unlock these features.
+                    </p>
+                    <div className="space-y-3">
+                      <button
+                        type="button"
+                        className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold rounded-xl transition-all"
+                        onClick={() => setShowPremiumModal(false)}
+                      >
+                        Upgrade to Premium
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full py-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium transition-colors"
+                        onClick={() => setShowPremiumModal(false)}
+                      >
+                        Maybe Later
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Error Message */}
             {error && (
               <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3 animate-fade-in">
@@ -218,7 +359,7 @@ We're looking for a Senior Product Manager to lead our payments team. You'll be 
                       {progressMessages[progressIndex].text}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      This usually takes 30-60 seconds
+                      This usually takes 2-3 minutes
                     </p>
                   </div>
                 </div>

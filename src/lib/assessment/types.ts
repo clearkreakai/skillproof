@@ -14,14 +14,16 @@
  * Each type tests different skills and requires different scoring
  */
 export type QuestionType = 
-  | 'crisis_simulation'      // Multi-fire scenario testing prioritization
+  | 'crisis_simulation'      // Competing priorities (max 2), testing prioritization
   | 'communication_draft'    // Write actual emails, Slacks, messages
   | 'strategic_prioritization' // Resource allocation, tradeoff decisions
   | 'data_interpretation'    // Extract insights from metrics/data
   | 'stakeholder_navigation' // Political savvy, conflict resolution
   | 'reverse_engineering'    // Analyze outcomes, recreate strategies
   | 'artifact_creation'      // Create actual deliverables (briefs, decks, etc.)
-  | 'multi_part_scenario';   // Building scenario with escalation
+  | 'multi_part_scenario'    // Building scenario with escalation
+  | 'tools_proficiency'      // Practical knowledge of tools/systems for the job
+  | 'operational_workflow';  // Normal day-to-day tasks, routine competence
 
 /**
  * The role categories we optimize questions for
@@ -121,7 +123,7 @@ export interface RoleResearch {
  * Scoring dimension - what we actually measure
  */
 export interface ScoringDimension {
-  name: 'relevance' | 'judgment' | 'communication' | 'execution' | 'company_fit';
+  name: 'relevance' | 'judgment' | 'communication' | 'execution' | 'company_fit' | 'technical_proficiency';
   weight: number;  // 0-1, weights should sum to 1
   description: string;
 }
@@ -441,6 +443,20 @@ export const QUESTION_TYPE_CONFIGS: Record<QuestionType, QuestionTypeConfig> = {
     bestFor: ['customer_success', 'sales', 'product'],
     typicalTime: 8,
     skillsUsuallyTested: ['consistency', 'adaptation', 'depth_of_thinking', 'follow_through']
+  },
+  tools_proficiency: {
+    type: 'tools_proficiency',
+    description: 'Practical knowledge of tools and systems required for the job',
+    bestFor: ['sales', 'customer_success', 'marketing', 'finance', 'operations', 'engineering'],
+    typicalTime: 4,
+    skillsUsuallyTested: ['technical_proficiency', 'tool_fluency', 'practical_knowledge', 'workflow_efficiency']
+  },
+  operational_workflow: {
+    type: 'operational_workflow',
+    description: 'Normal day-to-day tasks that test routine competence and work habits',
+    bestFor: ['general', 'sales', 'customer_success', 'product', 'marketing', 'operations', 'engineering'],
+    typicalTime: 4,
+    skillsUsuallyTested: ['organization', 'planning', 'process_discipline', 'attention_to_detail', 'routine_execution']
   }
 };
 
@@ -449,64 +465,152 @@ export const QUESTION_TYPE_CONFIGS: Record<QuestionType, QuestionTypeConfig> = {
  */
 export const DEFAULT_QUESTION_MIX: Record<RoleCategory, Partial<Record<QuestionType, number>>> = {
   sales: {
-    communication_draft: 3,
+    communication_draft: 2,
     crisis_simulation: 1,
     strategic_prioritization: 1,
     stakeholder_navigation: 1,
-    multi_part_scenario: 2
+    multi_part_scenario: 1,
+    tools_proficiency: 1,
+    operational_workflow: 1  // Normal day: pipeline review, prep for calls, etc.
   },
   customer_success: {
     communication_draft: 2,
-    crisis_simulation: 2,
-    stakeholder_navigation: 2,
+    crisis_simulation: 1,
+    stakeholder_navigation: 1,
     data_interpretation: 1,
-    multi_part_scenario: 1
+    multi_part_scenario: 1,
+    tools_proficiency: 1,
+    operational_workflow: 1  // Normal day: health check, renewal prep, etc.
   },
   product: {
     strategic_prioritization: 2,
-    data_interpretation: 2,
-    stakeholder_navigation: 2,
+    data_interpretation: 1,
+    stakeholder_navigation: 1,
     artifact_creation: 1,
-    communication_draft: 1
+    communication_draft: 1,
+    tools_proficiency: 1,
+    operational_workflow: 1  // Normal day: PRD update, sprint planning, etc.
   },
   marketing: {
-    strategic_prioritization: 2,
-    artifact_creation: 2,
-    reverse_engineering: 2,
+    strategic_prioritization: 1,
+    artifact_creation: 1,
+    reverse_engineering: 1,
     data_interpretation: 1,
-    communication_draft: 1
+    communication_draft: 2,
+    tools_proficiency: 1,
+    operational_workflow: 1  // Normal day: campaign review, content planning, etc.
   },
   engineering: {
-    strategic_prioritization: 2,
-    stakeholder_navigation: 2,
+    strategic_prioritization: 1,
+    stakeholder_navigation: 1,
     artifact_creation: 2,
     data_interpretation: 1,
-    communication_draft: 1
+    communication_draft: 1,
+    tools_proficiency: 1,
+    operational_workflow: 1  // Normal day: code review, PR feedback, etc.
   },
   operations: {
-    crisis_simulation: 2,
-    strategic_prioritization: 2,
+    crisis_simulation: 1,
+    strategic_prioritization: 1,
     data_interpretation: 2,
     artifact_creation: 1,
-    stakeholder_navigation: 1
+    stakeholder_navigation: 1,
+    tools_proficiency: 1,
+    operational_workflow: 1  // Normal day: process documentation, metrics review
   },
   people: {
-    communication_draft: 3,
+    communication_draft: 2,
     stakeholder_navigation: 2,
-    crisis_simulation: 2,
-    artifact_creation: 1
+    crisis_simulation: 1,
+    artifact_creation: 1,
+    tools_proficiency: 1,
+    operational_workflow: 1  // Normal day: interview prep, policy review
   },
   finance: {
-    data_interpretation: 3,
-    strategic_prioritization: 2,
+    data_interpretation: 2,
+    strategic_prioritization: 1,
     artifact_creation: 2,
-    communication_draft: 1
+    communication_draft: 1,
+    tools_proficiency: 1,
+    operational_workflow: 1  // Normal day: reconciliation, report prep
   },
   general: {
     communication_draft: 2,
-    strategic_prioritization: 2,
-    stakeholder_navigation: 2,
+    strategic_prioritization: 1,
+    stakeholder_navigation: 1,
     crisis_simulation: 1,
-    data_interpretation: 1
+    data_interpretation: 1,
+    tools_proficiency: 1,
+    operational_workflow: 1  // Normal day: weekly planning, status updates
   }
 };
+
+/**
+ * Role category to common tools mapping
+ * Used to infer tools when not explicitly mentioned in JD
+ */
+export const ROLE_TOOLS_MAPPING: Record<RoleCategory, {
+  primary: string[];
+  secondary: string[];
+  basicSkills: string[];
+}> = {
+  sales: {
+    primary: ['Salesforce', 'HubSpot', 'Outreach', 'SalesLoft', 'Gong', 'LinkedIn Sales Navigator'],
+    secondary: ['ZoomInfo', 'Apollo', 'Clari', 'Chorus', 'Calendly'],
+    basicSkills: ['CRM management', 'Pipeline tracking', 'Email sequences', 'Calendar management']
+  },
+  customer_success: {
+    primary: ['Gainsight', 'ChurnZero', 'Totango', 'Salesforce', 'Zendesk'],
+    secondary: ['Intercom', 'Freshdesk', 'Pendo', 'Mixpanel', 'Looker'],
+    basicSkills: ['Customer health scoring', 'Ticket management', 'Usage analytics', 'QBR preparation']
+  },
+  product: {
+    primary: ['Jira', 'Figma', 'Notion', 'ProductBoard', 'Linear'],
+    secondary: ['Amplitude', 'Mixpanel', 'FullStory', 'Miro', 'Confluence'],
+    basicSkills: ['Roadmap planning', 'User research documentation', 'Sprint planning', 'Feature prioritization']
+  },
+  marketing: {
+    primary: ['Google Analytics', 'HubSpot', 'Marketo', 'Semrush', 'Hootsuite'],
+    secondary: ['Mailchimp', 'Buffer', 'Canva', 'Ahrefs', 'Google Ads'],
+    basicSkills: ['Campaign tracking', 'A/B testing', 'Content scheduling', 'Lead scoring']
+  },
+  engineering: {
+    primary: ['Git', 'GitHub/GitLab', 'VS Code', 'Docker', 'AWS/GCP/Azure'],
+    secondary: ['Datadog', 'Sentry', 'Jenkins', 'Terraform', 'Kubernetes'],
+    basicSkills: ['Version control', 'CI/CD pipelines', 'Code review', 'Debugging tools']
+  },
+  operations: {
+    primary: ['Google Workspace', 'Slack', 'Asana', 'Monday.com', 'Notion'],
+    secondary: ['Zapier', 'Airtable', 'Confluence', 'Trello', 'Smartsheet'],
+    basicSkills: ['Project tracking', 'Process documentation', 'Workflow automation', 'Resource planning']
+  },
+  people: {
+    primary: ['Greenhouse', 'Lever', 'Workday', 'BambooHR', 'LinkedIn Recruiter'],
+    secondary: ['Culture Amp', 'Lattice', '15Five', 'Namely', 'Rippling'],
+    basicSkills: ['ATS management', 'Candidate sourcing', 'Interview scheduling', 'Performance tracking']
+  },
+  finance: {
+    primary: ['Excel', 'Google Sheets', 'NetSuite', 'QuickBooks', 'SAP'],
+    secondary: ['Tableau', 'Power BI', 'Stripe', 'Expensify', 'Bill.com'],
+    basicSkills: ['Financial modeling', 'Pivot tables', 'VLOOKUP/INDEX-MATCH', 'Data visualization']
+  },
+  general: {
+    primary: ['Google Workspace', 'Microsoft Office', 'Slack', 'Zoom'],
+    secondary: ['Notion', 'Asana', 'Trello', 'Calendly'],
+    basicSkills: ['Email communication', 'Calendar management', 'Document creation', 'Video conferencing']
+  }
+};
+
+/**
+ * Tool confidence levels for calibrating question depth
+ */
+export type ToolConfidence = 'explicit' | 'company_inferred' | 'role_inferred';
+
+/**
+ * Tools research result with confidence
+ */
+export interface ToolsResearch {
+  tools: string[];
+  confidence: ToolConfidence;
+  source: 'job_description' | 'company_research' | 'role_inference';
+}

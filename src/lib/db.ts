@@ -48,7 +48,8 @@ export interface DbResult {
  */
 export async function saveAssessment(
   assessment: Assessment,
-  jobDescription: string
+  jobDescription: string,
+  userId?: string
 ): Promise<{ id: string } | null> {
   const { data, error } = await supabase
     .from('assessments')
@@ -59,6 +60,7 @@ export async function saveAssessment(
       job_description: jobDescription,
       assessment_data: assessment,
       status: 'active',
+      user_id: userId || null,
     })
     .select('id')
     .single();

@@ -12,6 +12,8 @@ import {
   RoleCategory,
   CompanyStage,
   Result,
+  ROLE_TOOLS_MAPPING,
+  ToolsResearch,
 } from './types';
 import {
   buildCompanyResearchPrompt,
@@ -48,6 +50,10 @@ export async function researchCompany(
     const client = getAnthropicClient();
     const prompt = buildCompanyResearchPrompt(companyName, additionalContext);
 
+    // TODO: Integrate token tracking
+    // After response, add:
+    //   import { trackUsage } from '@/lib/tokenTracking';
+    //   await trackUsage(response, 'research_company');
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2000,
@@ -147,6 +153,10 @@ export async function extractRoleFromJobDescription(
     const client = getAnthropicClient();
     const prompt = buildRoleExtractionPrompt(jobDescription, companyResearch);
 
+    // TODO: Integrate token tracking
+    // After response, add:
+    //   import { trackUsage } from '@/lib/tokenTracking';
+    //   await trackUsage(response, 'extract_role');
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2000,
@@ -452,6 +462,168 @@ export async function getCompanyResearch(
 
   // Fall back to AI research
   return researchCompany(companyName, additionalContext);
+}
+
+// ============================================================================
+// TOOLS RESEARCH
+// ============================================================================
+
+/**
+ * Common tool names to look for in job descriptions
+ * Organized by category for better matching
+ */
+const COMMON_TOOLS = [
+  // CRM & Sales
+  'Salesforce', 'HubSpot', 'Pipedrive', 'Zoho', 'Outreach', 'SalesLoft', 'Gong', 'Chorus', 'Clari',
+  'LinkedIn Sales Navigator', 'ZoomInfo', 'Apollo', 'Clearbit',
+  // Customer Success
+  'Gainsight', 'ChurnZero', 'Totango', 'Zendesk', 'Intercom', 'Freshdesk', 'Front',
+  // Product & Design
+  'Jira', 'Linear', 'Asana', 'Monday.com', 'Trello', 'Notion', 'Confluence',
+  'Figma', 'Sketch', 'Adobe XD', 'InVision', 'Miro', 'Figjam',
+  'ProductBoard', 'Aha!', 'Pendo', 'Amplitude', 'Mixpanel', 'FullStory', 'Heap',
+  // Marketing
+  'Google Analytics', 'GA4', 'Marketo', 'Mailchimp', 'Klaviyo', 'Braze',
+  'Semrush', 'Ahrefs', 'Moz', 'Screaming Frog',
+  'Hootsuite', 'Buffer', 'Sprout Social',
+  'Google Ads', 'Facebook Ads', 'LinkedIn Ads', 'TikTok Ads',
+  'Canva', 'Adobe Creative Suite', 'Photoshop', 'Illustrator',
+  // Engineering
+  'Git', 'GitHub', 'GitLab', 'Bitbucket',
+  'VS Code', 'IntelliJ', 'PyCharm', 'Vim',
+  'Docker', 'Kubernetes', 'Terraform', 'Ansible',
+  'AWS', 'GCP', 'Azure', 'Heroku', 'Vercel',
+  'Jenkins', 'CircleCI', 'GitHub Actions', 'Travis CI',
+  'Datadog', 'New Relic', 'Splunk', 'Grafana', 'PagerDuty', 'Sentry',
+  'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'Elasticsearch',
+  // Finance & Analytics
+  'Excel', 'Google Sheets', 'Tableau', 'Power BI', 'Looker', 'Mode',
+  'NetSuite', 'QuickBooks', 'Xero', 'SAP', 'Oracle',
+  'Stripe', 'Braintree', 'Bill.com', 'Expensify', 'Ramp',
+  // HR & People
+  'Greenhouse', 'Lever', 'Workday', 'BambooHR', 'Rippling', 'Gusto',
+  'LinkedIn Recruiter', 'Indeed', 'AngelList',
+  'Culture Amp', 'Lattice', '15Five', 'Officevibe',
+  // General
+  'Slack', 'Microsoft Teams', 'Zoom', 'Google Meet',
+  'Google Workspace', 'Microsoft Office', 'Office 365',
+  'Zapier', 'Make', 'Integromat', 'Workato',
+  'Airtable', 'Smartsheet', 'Coda',
+];
+
+/**
+ * Extract tools explicitly mentioned in job description
+ */
+export function extractToolsFromJobDescription(jobDescription: string): string[] {
+  const foundTools: Set<string> = new Set();
+  const jdLower = jobDescription.toLowerCase();
+  
+  for (const tool of COMMON_TOOLS) {
+    // Create regex that matches the tool name with word boundaries
+    const toolLower = tool.toLowerCase();
+    const regex = new RegExp(`\\b${toolLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    
+    if (regex.test(jdLower)) {
+      foundTools.add(tool);
+    }
+  }
+  
+  // Also check the role's tools field if it was extracted
+  return Array.from(foundTools);
+}
+
+/**
+ * Get tools associated with well-known companies
+ */
+export function getCompanyTools(companyName: string): string[] {
+  const normalizedName = companyName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  
+  // Map well-known companies to their commonly-used tools
+  const companyToolsMap: Record<string, string[]> = {
+    stripe: ['Stripe Dashboard', 'Salesforce', 'Notion', 'Linear', 'Figma'],
+    notion: ['Notion', 'Figma', 'Linear', 'Amplitude'],
+    hubspot: ['HubSpot', 'Salesforce', 'Google Analytics', 'Tableau'],
+    figma: ['Figma', 'FigJam', 'Linear', 'Notion', 'Amplitude'],
+    shopify: ['Shopify Admin', 'Looker', 'Slack', 'Google Analytics'],
+    salesforce: ['Salesforce', 'Slack', 'Tableau', 'MuleSoft'],
+    gong: ['Gong', 'Salesforce', 'Outreach', 'LinkedIn Sales Navigator'],
+    datadog: ['Datadog', 'AWS', 'Kubernetes', 'GitHub', 'Jira'],
+    atlassian: ['Jira', 'Confluence', 'Bitbucket', 'Trello'],
+    asana: ['Asana', 'Slack', 'Google Workspace'],
+    slack: ['Slack', 'Salesforce', 'Jira'],
+  };
+  
+  return companyToolsMap[normalizedName] || [];
+}
+
+/**
+ * Infer tools based on role category
+ */
+export function inferToolsFromRole(roleCategory: RoleCategory, level: string): string[] {
+  const mapping = ROLE_TOOLS_MAPPING[roleCategory];
+  if (!mapping) return [];
+  
+  // Senior/Lead/Executive roles get broader tool expectations
+  if (['senior', 'lead', 'executive'].includes(level)) {
+    return [...mapping.primary, ...mapping.secondary.slice(0, 2)];
+  }
+  
+  // Entry/Mid level focus on primary tools and basic skills
+  return [...mapping.primary.slice(0, 3), ...mapping.basicSkills.slice(0, 2)];
+}
+
+/**
+ * Complete tools research with confidence level
+ * Priority: JD explicit > Company inferred > Role inferred
+ */
+export function researchTools(
+  jobDescription: string,
+  companyName: string,
+  roleCategory: RoleCategory,
+  roleLevel: string,
+  roleTools?: string[]
+): ToolsResearch {
+  // Priority 1: Tools explicitly mentioned in JD
+  const jdTools = extractToolsFromJobDescription(jobDescription);
+  
+  // Also include tools extracted during role research
+  if (roleTools && roleTools.length > 0) {
+    for (const tool of roleTools) {
+      if (!jdTools.includes(tool)) {
+        jdTools.push(tool);
+      }
+    }
+  }
+  
+  if (jdTools.length >= 2) {
+    return {
+      tools: jdTools,
+      confidence: 'explicit',
+      source: 'job_description',
+    };
+  }
+  
+  // Priority 2: Infer from company if well-known
+  const companyTools = getCompanyTools(companyName);
+  if (companyTools.length > 0) {
+    // Combine any JD tools with company tools
+    const combined = [...new Set([...jdTools, ...companyTools])];
+    return {
+      tools: combined,
+      confidence: jdTools.length > 0 ? 'explicit' : 'company_inferred',
+      source: jdTools.length > 0 ? 'job_description' : 'company_research',
+    };
+  }
+  
+  // Priority 3: Infer from role type
+  const roleInferredTools = inferToolsFromRole(roleCategory, roleLevel);
+  const combined = [...new Set([...jdTools, ...roleInferredTools])];
+  
+  return {
+    tools: combined,
+    confidence: jdTools.length > 0 ? 'explicit' : 'role_inferred',
+    source: jdTools.length > 0 ? 'job_description' : 'role_inference',
+  };
 }
 
 // ============================================================================

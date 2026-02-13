@@ -19,7 +19,7 @@ import {
   QUESTION_TYPE_CONFIGS,
 } from './types';
 import { buildAssessmentGenerationPrompt } from './prompts';
-import { performFullResearch } from './research';
+import { performFullResearch, researchTools } from './research';
 
 // ============================================================================
 // CLAUDE CLIENT
@@ -122,6 +122,15 @@ async function generateAssessmentFromResearch(
   const questionMix = calculateQuestionMix(role, questionCount, config.questionMix);
   const estimatedMinutes = calculateEstimatedTime(questionMix);
   
+  // Research tools for tools_proficiency questions
+  const toolsContext = researchTools(
+    role.rawJobDescription || '',
+    company.name,
+    role.category,
+    role.level,
+    role.tools
+  );
+  
   // Build the prompt
   const prompt = buildAssessmentGenerationPrompt(
     company,
@@ -130,12 +139,17 @@ async function generateAssessmentFromResearch(
     questionMix,
     difficulty,
     estimatedMinutes,
-    config.mustInclude
+    config.mustInclude,
+    toolsContext
   );
   
   try {
     const client = getAnthropicClient();
     
+    // TODO: Integrate token tracking
+    // After response, add:
+    //   import { trackUsage } from '@/lib/tokenTracking';
+    //   await trackUsage(response, 'generate_questions', assessment.id);
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 8000,
@@ -254,9 +268,10 @@ async function generateAssessmentFromResearch(
  */
 function transformQuestion(raw: Record<string, unknown>, index: number): AssessmentQuestion {
   const context = raw.context as Record<string, unknown> | undefined;
+  const questionType = (raw.type as string) || 'communication_draft';
   return {
     id: (raw.id as string) || `q${index + 1}`,
-    type: (raw.type as AssessmentQuestion['type']) || 'communication_draft',
+    type: questionType as AssessmentQuestion['type'],
     context: {
       role: (context?.role as string) || 'You are a professional',
       situation: (context?.situation as string) || '',
@@ -269,7 +284,7 @@ function transformQuestion(raw: Record<string, unknown>, index: number): Assessm
     expectedFormat: (raw.expectedFormat as AssessmentQuestion['expectedFormat']) || 'long_text',
     wordGuidance: raw.wordGuidance as { min: number; max: number } | undefined,
     timeGuidance: (raw.timeGuidance as number) || 3,
-    rubric: transformRubric(raw.rubric as Record<string, unknown> | undefined),
+    rubric: transformRubric(raw.rubric as Record<string, unknown> | undefined, questionType),
     skillsTested: (raw.skillsTested as string[]) || [],
     whyThisMatters: (raw.whyThisMatters as string) || '',
     whatGreatLooksLike: (raw.whatGreatLooksLike as string) || '',
@@ -277,16 +292,34 @@ function transformQuestion(raw: Record<string, unknown>, index: number): Assessm
 }
 
 /**
- * Transform raw rubric data into typed ScoringRubric
+ * Get default dimensions based on question type
  */
-function transformRubric(raw: Record<string, unknown> | undefined): AssessmentQuestion['rubric'] {
-  const defaultDimensions: AssessmentQuestion['rubric']['dimensions'] = [
+function getDefaultDimensions(questionType: string): AssessmentQuestion['rubric']['dimensions'] {
+  if (questionType === 'tools_proficiency') {
+    return [
+      { name: 'technical_proficiency', weight: 0.35, description: 'Do they demonstrate practical knowledge of the tool?' },
+      { name: 'execution', weight: 0.25, description: 'Did they provide clear, actionable steps?' },
+      { name: 'relevance', weight: 0.2, description: 'Did they address the actual use case?' },
+      { name: 'judgment', weight: 0.1, description: 'Did they show good workflow/efficiency thinking?' },
+      { name: 'communication', weight: 0.1, description: 'Was the explanation clear and understandable?' },
+    ];
+  }
+  
+  // Default dimensions for other question types
+  return [
     { name: 'relevance', weight: 0.25, description: 'Did they address the actual problem?' },
     { name: 'judgment', weight: 0.25, description: 'Did they make good decisions?' },
     { name: 'communication', weight: 0.2, description: 'Was it clear and appropriate?' },
     { name: 'execution', weight: 0.2, description: 'Did they complete the task?' },
     { name: 'company_fit', weight: 0.1, description: 'Does it fit the company context?' },
   ];
+}
+
+/**
+ * Transform raw rubric data into typed ScoringRubric
+ */
+function transformRubric(raw: Record<string, unknown> | undefined, questionType?: string): AssessmentQuestion['rubric'] {
+  const defaultDimensions = getDefaultDimensions(questionType || 'communication_draft');
 
   return {
     dimensions: (raw?.dimensions as AssessmentQuestion['rubric']['dimensions']) || defaultDimensions,

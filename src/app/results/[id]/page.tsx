@@ -49,7 +49,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   // Handle both Promise and direct object (Next.js version compatibility)
   const resolvedParams = params instanceof Promise ? use(params) : params;
   const { id } = resolvedParams;
-  
+
   const [result, setResult] = useState<ResultData | null>(null);
   const [assessment, setAssessment] = useState<AssessmentInfo | null>(null);
   const [shareToken, setShareToken] = useState<string | null>(null);
@@ -58,6 +58,12 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const [showShareToast, setShowShareToast] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [percentile, setPercentile] = useState<number | null>(null);
+  const [integrityNotes, setIntegrityNotes] = useState<string[]>([]);
 
   useEffect(() => {
     async function fetchResults() {
@@ -73,6 +79,38 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
         setAssessment(data.assessment);
         setShareToken(data.shareToken);
         setStatus('ready');
+
+        // Fetch percentile if we have role and score
+        if (data.assessment?.role && data.result?.overallScore !== undefined) {
+          try {
+            const percentileRes = await fetch(
+              `/api/benchmarks?role=${encodeURIComponent(data.assessment.role)}&score=${data.result.overallScore}`
+            );
+            const percentileData = await percentileRes.json();
+            if (percentileData.percentile !== undefined) {
+              setPercentile(percentileData.percentile);
+            }
+          } catch (e) {
+            console.warn('Failed to fetch percentile:', e);
+          }
+        }
+
+        // Build integrity notes
+        const notes: string[] = [];
+        const estimatedSeconds = (data.assessment?.questions?.length || 8) * 5 * 60; // ~5 min per question estimate
+        const actualSeconds = data.result?.totalTimeSeconds || 0;
+        
+        if (actualSeconds > 0 && actualSeconds < estimatedSeconds * 0.4) {
+          notes.push(`⚡ Completed quickly: ${Math.round(actualSeconds / 60)} min (estimated: ${Math.round(estimatedSeconds / 60)} min)`);
+        }
+        
+        // Check for paste flags in question scores if they exist
+        // For now we'll show if any response was flagged
+        if (data.result?.questionScores?.some((q: { pasteDetected?: boolean }) => q.pasteDetected)) {
+          notes.push('📋 Some responses included pasted content');
+        }
+        
+        setIntegrityNotes(notes);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load results');
         setStatus('error');
@@ -104,12 +142,17 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
     setExpandedQuestions(new Set());
   };
 
+  const getShareUrl = () => {
+    if (!shareToken) return '';
+    return `${window.location.origin}/results/${shareToken}?share=true`;
+  };
+
   const handleShare = async () => {
     if (!shareToken) return;
-    
-    const shareUrl = `${window.location.origin}/results/${shareToken}?share=true`;
+
+    const shareUrl = getShareUrl();
     const success = await copyToClipboard(shareUrl);
-    
+
     if (success) {
       setCopied(true);
       setShowShareToast(true);
@@ -118,6 +161,44 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
         setShowShareToast(false);
       }, 3000);
     }
+  };
+
+  const handleEmailShare = async () => {
+    if (!recipientEmail || !shareToken || !result || !assessment) return;
+    
+    setEmailSending(true);
+    
+    // For now, create a mailto link with pre-filled content
+    const shareUrl = getShareUrl();
+    const subject = encodeURIComponent(`My ${assessment.role} Assessment Results - ${result.overallScore}/100`);
+    const body = encodeURIComponent(
+`Hi,
+
+I recently completed a skills assessment for the ${assessment.role} position at ${assessment.company} and wanted to share my results with you.
+
+Overall Score: ${result.overallScore}/100
+Rating: ${result.tier.charAt(0).toUpperCase() + result.tier.slice(1).replace('_', ' ')}
+
+Top Strengths:
+${result.topStrengths.map(s => `• ${s}`).join('\n')}
+
+You can view my full assessment results here:
+${shareUrl}
+
+Thank you for your consideration!
+`
+    );
+    
+    window.open(`mailto:${recipientEmail}?subject=${subject}&body=${body}`, '_blank');
+    
+    setEmailSending(false);
+    setEmailSent(true);
+    
+    setTimeout(() => {
+      setShowShareModal(false);
+      setEmailSent(false);
+      setRecipientEmail('');
+    }, 2000);
   };
 
   const getScoreLabel = (score: number) => {
@@ -135,11 +216,11 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
         <nav className="fixed top-0 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-50 border-b border-gray-100 dark:border-slate-800">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
-              <Link href="/" className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">SP</span>
-                </div>
-                <span className="font-semibold text-xl text-gray-900 dark:text-white">SkillProof</span>
+              <Link href="/" className="flex items-center">
+                <span className="text-2xl font-black tracking-tight bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 bg-clip-text text-transparent">
+                  METTLE
+                </span>
+                <div className="ml-1.5 w-1.5 h-1.5 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 animate-pulse"></div>
               </Link>
             </div>
           </div>
@@ -200,11 +281,11 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
       <nav className="fixed top-0 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl z-50 border-b border-gray-100 dark:border-slate-800">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-                <span className="text-white font-bold text-sm">SP</span>
-              </div>
-              <span className="font-semibold text-xl text-gray-900 dark:text-white">SkillProof</span>
+            <Link href="/" className="flex items-center">
+              <span className="text-2xl font-black tracking-tight bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 bg-clip-text text-transparent">
+                METTLE
+              </span>
+              <div className="ml-1.5 w-1.5 h-1.5 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 animate-pulse"></div>
             </Link>
             <div className="flex items-center gap-3">
               <button
@@ -252,11 +333,54 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
           <div className="grid lg:grid-cols-5 gap-6 mb-10">
             {/* Main Score Card */}
             <div className="lg:col-span-2 animate-fade-in-up">
-              <TierBadge 
-                tier={result.tier} 
+              <TierBadge
+                tier={result.tier}
                 score={result.overallScore}
                 animated={true}
               />
+              
+              {/* Percentile Badge */}
+              {percentile !== null && (
+                <div className="mt-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-sm text-indigo-600 dark:text-indigo-400 font-medium">Percentile Ranking</div>
+                      <div className="text-xl font-bold text-gray-900 dark:text-white">
+                        Top {100 - percentile}%
+                        <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-2">
+                          of similar roles
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Integrity Notes (for recruiters) */}
+              {integrityNotes.length > 0 && (
+                <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">Integrity Notes</div>
+                      <ul className="text-sm text-amber-700 dark:text-amber-400 space-y-1">
+                        {integrityNotes.map((note, idx) => (
+                          <li key={idx}>{note}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Summary & Highlights */}
@@ -272,7 +396,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
               <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-6">
                 {result.summary}
               </p>
-              
+
               <div className="grid sm:grid-cols-2 gap-6">
                 {/* Strengths */}
                 {result.topStrengths.length > 0 && (
@@ -324,7 +448,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                 </span>
                 Skills Breakdown
               </h2>
-              
+
               <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
                 {result.skillAnalysis.skillScores.map((skill) => (
                   <ProgressBar
@@ -368,13 +492,13 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                 Why This Assessment Matters
               </h2>
               <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-4">
-                Unlike traditional interviews or generic skill tests, this assessment was <strong>customized specifically</strong> for 
+                Unlike traditional interviews or generic skill tests, this assessment was <strong>customized specifically</strong> for
                 the <span className="font-semibold text-blue-600 dark:text-blue-400">{assessment.role}</span> role at <span className="font-semibold text-blue-600 dark:text-blue-400">{assessment.company}</span>.
               </p>
               <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                It tested real scenarios you&apos;d face in the first months on the job — prioritization 
-                decisions, stakeholder communication, and strategic thinking specific to this position. 
-                Your score reflects how well you&apos;d perform in <em>actual work situations</em>, not how 
+                It tested real scenarios you&apos;d face in the first months on the job - prioritization
+                decisions, stakeholder communication, and strategic thinking specific to this position.
+                Your score reflects how well you&apos;d perform in <em>actual work situations</em>, not how
                 well you memorized answers.
               </p>
             </div>
@@ -441,7 +565,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                           questionScore.overallScore >= 2 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' :
                           'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                         )}>
-                          {questionScore.overallScore.toFixed(1)}/5 — {getScoreLabel(questionScore.overallScore)}
+                          {questionScore.overallScore.toFixed(1)}/5 - {getScoreLabel(questionScore.overallScore)}
                         </span>
                         <svg
                           className={cn('w-5 h-5 text-gray-400 transition-transform', isExpanded && 'rotate-180')}
@@ -475,7 +599,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
                                         'h-full rounded-full transition-all duration-500',
                                         dim.score >= 4 ? 'bg-gradient-to-r from-green-500 to-emerald-400' :
                                         dim.score >= 3 ? 'bg-gradient-to-r from-blue-500 to-indigo-400' :
-                                        dim.score >= 2 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' : 
+                                        dim.score >= 2 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' :
                                         'bg-gradient-to-r from-red-500 to-orange-400'
                                       )}
                                       style={{ width: `${(dim.score / 5) * 100}%` }}
@@ -577,13 +701,13 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in-up">
             <button
-              onClick={handleShare}
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl transition-all shadow-xl shadow-blue-500/25 hover:shadow-2xl hover:shadow-blue-500/30 hover:scale-[1.02]"
+              onClick={() => setShowShareModal(true)}
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold rounded-xl transition-all shadow-xl shadow-blue-500/25 hover:shadow-2xl hover:shadow-blue-500/30 hover:scale-[1.02]"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
               </svg>
-              {copied ? 'Link Copied!' : 'Share Results'}
+              Share Results
             </button>
             <Link
               href="/assess"
@@ -595,6 +719,107 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
               Take Another Assessment
             </Link>
           </div>
+
+          {/* Share Modal */}
+          {showShareModal && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowShareModal(false)}>
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Share Your Results</h3>
+                  <button onClick={() => setShowShareModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Copy Link Section */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Share Link
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={getShareUrl()}
+                      className="flex-1 px-4 py-3 bg-gray-100 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl text-sm text-gray-600 dark:text-gray-300 truncate"
+                    />
+                    <button
+                      onClick={handleShare}
+                      className="px-4 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-2"
+                    >
+                      {copied ? (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-200 dark:border-slate-700"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="px-3 bg-white dark:bg-slate-800 text-sm text-gray-500">or email directly</span>
+                  </div>
+                </div>
+
+                {/* Email Section */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Send to Recruiter / Hiring Manager
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      placeholder="recruiter@company.com"
+                      value={recipientEmail}
+                      onChange={(e) => setRecipientEmail(e.target.value)}
+                      className="flex-1 px-4 py-3 border border-gray-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={handleEmailShare}
+                      disabled={!recipientEmail || emailSending}
+                      className="px-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-medium rounded-xl hover:from-blue-700 hover:to-cyan-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {emailSent ? (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Sent
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          Email
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Opens your email client with a pre-written message and your results link
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
@@ -602,10 +827,10 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
       <footer className="py-8 px-4 border-t border-gray-100 dark:border-slate-800 no-print">
         <div className="max-w-5xl mx-auto text-center">
           <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
-            <div className="w-6 h-6 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-md flex items-center justify-center">
-              <span className="text-white font-bold text-2xs">SP</span>
-            </div>
-            Assessment powered by SkillProof
+            <span className="font-black tracking-tight bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 bg-clip-text text-transparent">
+              METTLE
+            </span>
+            <span>• Assessment Platform</span>
           </div>
           <p className="text-sm text-gray-400 dark:text-gray-500">
             Verified • Ungameable • Role-Specific

@@ -2,16 +2,44 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { getUser, signOut, onAuthStateChange } from '@/lib/auth';
+import type { User } from '@supabase/supabase-js';
 
 export default function Home() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    
+    // Load user
+    getUser().then(u => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+
+    // Subscribe to auth changes
+    const { data: { subscription } } = onAuthStateChange((session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+
+  const handleSignOut = async () => {
+    await signOut();
+    setMenuOpen(false);
+    router.refresh();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,60 +69,160 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950 overflow-hidden">
+    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 overflow-hidden">
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none">
         {/* Gradient orbs */}
         <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-blue-500/20 rounded-full blur-[120px] animate-pulse-glow" />
-        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-violet-500/15 rounded-full blur-[100px] animate-pulse-glow animation-delay-2000" />
+        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-cyan-500/15 rounded-full blur-[100px] animate-pulse-glow animation-delay-2000" />
         
         {/* Grid pattern */}
         <div className="absolute inset-0 hero-grid opacity-40 dark:opacity-20" />
       </div>
 
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl z-50 border-b border-gray-200/50 dark:border-slate-800/50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                  <span className="text-white font-bold text-sm">SP</span>
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl blur-lg opacity-40" />
+      {/* Floating Nav */}
+      <div className="fixed top-6 right-6 z-50 flex items-center gap-3">
+        {authLoading ? (
+          <div className="w-20 h-10 bg-white/20 backdrop-blur-xl rounded-xl animate-pulse" />
+        ) : user ? (
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-xl border border-gray-200/50 dark:border-slate-700/50 shadow-lg hover:shadow-xl transition-all"
+            >
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-medium">
+                {user.email?.charAt(0).toUpperCase()}
               </div>
-              <span className="font-semibold text-xl text-gray-900 dark:text-white">SkillProof</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link
-                href="/assess"
-                className="btn-primary text-sm"
+              <svg 
+                className={`w-4 h-4 text-gray-500 transition-transform ${menuOpen ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
               >
-                Try It Now
-              </Link>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-100 dark:border-slate-700 py-2 animate-fade-in-down">
+                <Link
+                  href="/dashboard"
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                  Dashboard
+                </Link>
+                <Link
+                  href="/assess"
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  New Assessment
+                </Link>
+                <div className="border-t border-gray-100 dark:border-slate-700 mt-2 pt-2">
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <Link
+              href="/login"
+              className="px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-xl border border-gray-200/50 dark:border-slate-700/50 shadow-lg hover:shadow-xl transition-all"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/assess"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-[1.02]"
+            >
+              Try It Now
+            </Link>
+          </>
+        )}
+      </div>
+
+      {/* Hero Section - Full Screen Dictionary Intro */}
+      <section className="relative min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
+        <div className={`w-full max-w-5xl mx-auto text-center transition-all duration-1000 ${mounted ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+          
+          {/* Futuristic Dictionary Card - THE HERO */}
+          <div 
+            className="relative cursor-pointer group"
+            onClick={() => document.getElementById('content')?.scrollIntoView({ behavior: 'smooth' })}
+          >
+            {/* Outer glow effects */}
+            <div className="absolute -inset-8 bg-gradient-to-r from-blue-500/40 via-cyan-400/30 to-blue-500/40 rounded-3xl blur-3xl animate-pulse-glow" />
+            <div className="absolute -inset-2 bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-400 rounded-3xl opacity-30 blur-xl" />
+            
+            {/* Main card */}
+            <div className="relative bg-white dark:bg-slate-900 backdrop-blur-2xl rounded-3xl border-2 border-blue-200/60 dark:border-cyan-500/30 p-10 sm:p-16 lg:p-20 shadow-2xl shadow-blue-500/10 transition-all duration-300 group-hover:shadow-blue-500/20 group-hover:scale-[1.01]">
+              {/* Animated border glow */}
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-blue-500/5 via-cyan-400/10 to-blue-500/5 pointer-events-none" />
+              
+              {/* Decorative corner accents */}
+              <div className="absolute top-0 left-0 w-20 h-20 border-l-2 border-t-2 border-blue-500/40 rounded-tl-3xl" />
+              <div className="absolute top-0 right-0 w-20 h-20 border-r-2 border-t-2 border-cyan-500/40 rounded-tr-3xl" />
+              <div className="absolute bottom-0 left-0 w-20 h-20 border-l-2 border-b-2 border-cyan-500/40 rounded-bl-3xl" />
+              <div className="absolute bottom-0 right-0 w-20 h-20 border-r-2 border-b-2 border-blue-500/40 rounded-br-3xl" />
+              
+              {/* Content */}
+              <div className="relative text-left">
+                {/* Word and pronunciation line */}
+                <div className="flex flex-wrap items-baseline gap-3 sm:gap-5 mb-6">
+                  <h1 className="font-serif text-6xl sm:text-7xl lg:text-8xl font-bold text-gray-900 dark:text-white tracking-tight">
+                    Met·tle
+                  </h1>
+                  <span className="text-2xl sm:text-3xl text-gray-400 dark:text-gray-500 font-mono tracking-wide">/ˈmedl/</span>
+                  <span className="text-xl text-gray-400 dark:text-gray-500 italic">noun</span>
+                </div>
+                
+                {/* Definition */}
+                <p className="text-xl sm:text-2xl text-gray-500 dark:text-gray-400 leading-relaxed font-light italic">
+                  the stuff you&apos;re made of
+                </p>
+              </div>
+              
+              {/* Subtle scan line effect */}
+              <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/5 to-transparent h-40 animate-scan" />
+              </div>
+            </div>
+            
+            {/* Continue indicator */}
+            <div className="mt-8 flex flex-col items-center animate-bounce-subtle">
+              <span className="text-sm text-gray-500 dark:text-gray-400 mb-2 group-hover:text-blue-500 transition-colors">Click to continue</span>
+              <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              </svg>
             </div>
           </div>
         </div>
-      </nav>
+      </section>
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-24 px-4 sm:px-6 lg:px-8">
-        <div className={`max-w-5xl mx-auto text-center transition-all duration-1000 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-          
-          {/* Beta Badge */}
-          <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800/50 mb-8 animate-fade-in-down">
-            <span className="relative flex h-2 w-2 mr-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span className="text-green-700 dark:text-green-300 text-sm font-medium">Now in Public Beta</span>
-          </div>
-
-          {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-gray-900 dark:text-white leading-[1.1] mb-8 text-balance">
+      {/* Content Section */}
+      <section id="content" className="relative -mt-12 py-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto text-center">
+          {/* Tagline */}
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white leading-snug mb-6">
             Resumes show where you&apos;ve been.
-            <span className="block mt-2 gradient-text">SkillProof shows what you can do.</span>
-          </h1>
+            <span className="block gradient-text">Mettle shows what you can do.</span>
+          </h2>
 
           {/* Subheadline */}
           <p className="text-xl sm:text-2xl text-gray-600 dark:text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed text-balance">
@@ -106,29 +234,23 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
             <Link
               href="/assess"
-              className="group relative inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl transition-all duration-300 text-lg shadow-xl shadow-blue-500/30 hover:shadow-2xl hover:shadow-blue-500/40 hover:scale-[1.02]"
+              className="group relative inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold rounded-xl transition-all duration-300 text-lg shadow-xl shadow-blue-500/30 hover:shadow-2xl hover:shadow-blue-500/40 hover:scale-[1.02]"
             >
               <svg className="w-5 h-5 group-hover:animate-bounce-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               Start Your Assessment
-              <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 blur-xl opacity-40 group-hover:opacity-60 transition-opacity" />
+              <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 blur-xl opacity-40 group-hover:opacity-60 transition-opacity" />
             </Link>
           </div>
 
-          <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2">
-            <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-            No signup required • Free to try • Results in minutes
-          </p>
         </div>
 
         {/* Hero Visual: Mockup/Preview */}
         <div className={`max-w-4xl mx-auto mt-16 transition-all duration-1000 delay-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
           <div className="relative">
             {/* Glow effect behind card */}
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-indigo-500/20 to-violet-500/20 rounded-3xl blur-2xl transform scale-105" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-cyan-500/20 to-blue-500/20 rounded-3xl blur-2xl transform scale-105" />
             
             {/* Card */}
             <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200/50 dark:border-slate-700/50 overflow-hidden">
@@ -141,7 +263,7 @@ export default function Home() {
                 </div>
                 <div className="flex-1 mx-4">
                   <div className="max-w-xs mx-auto h-6 bg-gray-200 dark:bg-slate-700 rounded-md flex items-center justify-center">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">skillproof.io/assess</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">getmettle.io/assess</span>
                   </div>
                 </div>
               </div>
@@ -188,7 +310,7 @@ export default function Home() {
                           <span className="font-medium text-gray-900 dark:text-white">76%</span>
                         </div>
                         <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div className="h-full w-[76%] bg-gradient-to-r from-blue-500 to-indigo-400 rounded-full" />
+                          <div className="h-full w-[76%] bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full" />
                         </div>
                       </div>
                       <div>
@@ -214,12 +336,12 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1">15min</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">Average Assessment Time</div>
+              <div className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1">~20min</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Average Assessment</div>
             </div>
             <div>
-              <div className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1">8</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">Scenario Questions</div>
+              <div className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1">Real</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Scenario-Based Questions</div>
             </div>
             <div>
               <div className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1">AI</div>
@@ -251,14 +373,14 @@ export default function Home() {
               <div className="card p-8 h-full transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-colors" />
                 <div className="relative">
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/30">
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/30">
                     <span className="text-2xl font-bold text-white">1</span>
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-                    Paste the Job Description
+                    Paste Job Description & Company
                   </h3>
                   <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                    Copy any job posting you&apos;re applying for. Our AI extracts the key skills and requirements that actually matter.
+                    Copy any job posting you&apos;re applying for and add the company details. Our AI extracts the key skills and requirements that actually matter.
                   </p>
                 </div>
               </div>
@@ -266,17 +388,17 @@ export default function Home() {
 
             {/* Step 2 */}
             <div className="group relative">
-              <div className="card p-8 h-full transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-colors" />
+              <div className="card p-8 h-full transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-colors" />
                 <div className="relative">
-                  <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/30">
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-cyan-500/30">
                     <span className="text-2xl font-bold text-white">2</span>
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
                     Take Your Assessment
                   </h3>
                   <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                    Complete scenario-based questions designed to test the actual skills needed for that specific role. About 15-25 minutes.
+                    Complete scenario-based questions designed to test the actual skills needed for that specific role. Quick and focused.
                   </p>
                 </div>
               </div>
@@ -284,10 +406,10 @@ export default function Home() {
 
             {/* Step 3 */}
             <div className="group relative">
-              <div className="card p-8 h-full transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/10">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 rounded-full blur-2xl group-hover:bg-violet-500/10 transition-colors" />
+              <div className="card p-8 h-full transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-colors" />
                 <div className="relative">
-                  <div className="w-14 h-14 bg-gradient-to-br from-violet-500 to-purple-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-violet-500/30">
+                  <div className="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-cyan-500/30">
                     <span className="text-2xl font-bold text-white">3</span>
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
@@ -317,10 +439,10 @@ export default function Home() {
 
           <div className="grid md:grid-cols-2 gap-8">
             {/* Job Seekers */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-violet-900/20 p-8 lg:p-10 border border-blue-100 dark:border-blue-800/50">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-50 via-blue-50 to-cyan-50 dark:from-blue-900/20 dark:via-blue-900/20 dark:to-cyan-900/20 p-8 lg:p-10 border border-blue-100 dark:border-blue-800/50">
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
               <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-blue-500/30">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-blue-500/30">
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
@@ -332,6 +454,7 @@ export default function Home() {
                   {[
                     'Stand out in a sea of similar resumes',
                     'Prove skills when changing careers',
+                    'Test your readiness before you apply',
                     'Get actionable feedback on skill gaps',
                     'Build a portfolio of verified skills',
                   ].map((item, idx) => (
@@ -385,7 +508,7 @@ export default function Home() {
       {/* Waitlist CTA */}
       <section id="waitlist" className="py-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
         {/* Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-cyan-600 to-blue-600" />
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.05\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]" />
         
         <div className="relative max-w-3xl mx-auto text-center">
@@ -393,7 +516,7 @@ export default function Home() {
             Ready to prove what you can do?
           </h2>
           <p className="text-xl text-blue-100 mb-10">
-            Join thousands of professionals using SkillProof to stand out
+            Join thousands of professionals using Mettle to stand out
           </p>
           
           <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto mb-6">
@@ -438,14 +561,14 @@ export default function Home() {
       <footer className="py-12 px-4 sm:px-6 lg:px-8 bg-gray-900 dark:bg-slate-950">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-sm">SP</span>
-              </div>
-              <span className="font-semibold text-xl text-white">SkillProof</span>
+            <div className="flex items-center">
+              <span className="text-2xl font-black tracking-tight bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                METTLE
+              </span>
+              <div className="ml-1.5 w-1.5 h-1.5 rounded-full bg-gradient-to-r from-cyan-400 to-blue-400 animate-pulse"></div>
             </div>
             <div className="flex items-center gap-8 text-gray-400">
-              <a href="mailto:hello@skillproof.io" className="hover:text-white transition-colors text-sm">
+              <a href="mailto:hello@getmettle.io" className="hover:text-white transition-colors text-sm">
                 Contact
               </a>
               <a href="#" className="hover:text-white transition-colors text-sm">
@@ -456,8 +579,24 @@ export default function Home() {
               </a>
             </div>
           </div>
-          <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-500 text-sm">
-            © {new Date().getFullYear()} SkillProof by ClearKreak. All rights reserved.
+          
+          {/* Dictionary Footer Signature */}
+          <div className="mt-10 pt-8 border-t border-gray-800">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-3 text-gray-500">
+                <span className="font-serif text-lg text-gray-300 tracking-tight">met·tle</span>
+                <span className="mx-2 text-gray-600">·</span>
+                <span className="text-sm text-gray-500 font-mono">/ˈmedl/</span>
+                <span className="mx-2 text-gray-600">·</span>
+                <span className="text-sm text-gray-500 italic">noun</span>
+              </div>
+              <p className="text-gray-400 text-sm max-w-md leading-relaxed">
+                the stuff you&apos;re made of
+              </p>
+              <p className="mt-6 text-gray-600 text-xs">
+                © {new Date().getFullYear()} Mettle by ClearKreak. All rights reserved.
+              </p>
+            </div>
           </div>
         </div>
       </footer>

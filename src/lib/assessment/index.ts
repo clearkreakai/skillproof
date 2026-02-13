@@ -68,11 +68,16 @@ export type {
   
   // Utility types
   QuestionTypeConfig,
+  
+  // Tools research types
+  ToolsResearch,
+  ToolConfidence,
 } from './types';
 
 export {
   QUESTION_TYPE_CONFIGS,
   DEFAULT_QUESTION_MIX,
+  ROLE_TOOLS_MAPPING,
 } from './types';
 
 // ============================================================================
@@ -88,6 +93,11 @@ export {
   getCompanyResearch,
   performFullResearch,
   WELL_KNOWN_COMPANIES,
+  // Tools research functions
+  extractToolsFromJobDescription,
+  getCompanyTools,
+  inferToolsFromRole,
+  researchTools,
 } from './research';
 
 // ============================================================================

@@ -79,6 +79,36 @@ export async function POST(
       console.warn('Failed to save result to database');
     }
 
+    // Calculate integrity metrics from responses
+    const pasteDetected = responses.some((r: QuestionResponse & { pasteDetected?: boolean }) => 
+      (r as { pasteDetected?: boolean }).pasteDetected
+    );
+    const avgPastePercentage = responses.reduce((sum: number, r: QuestionResponse & { pastedPercentage?: number }) => 
+      sum + ((r as { pastedPercentage?: number }).pastedPercentage || 0), 0
+    ) / responses.length;
+
+    // Save benchmark data (non-blocking)
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/benchmarks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roleTitle: assessment.role.title,
+          overallScore: result.overallScore,
+          tier: result.tier,
+          totalTimeSeconds: result.totalTimeSeconds,
+          estimatedTimeSeconds: assessment.estimatedMinutes * 60,
+          questionCount: assessment.questions.length,
+          pasteDetected,
+          avgPastePercentage,
+          assessmentId: result.id,
+        }),
+      });
+    } catch (benchmarkError) {
+      console.warn('Failed to save benchmark data:', benchmarkError);
+      // Don't fail the whole scoring if benchmarks fail
+    }
+
     return NextResponse.json({
       success: true,
       resultId: result.id,

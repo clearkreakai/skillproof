@@ -157,6 +157,14 @@ ASSESSMENT REQUIREMENTS:
 QUESTION MIX TO GENERATE:
 {{questionMixJson}}
 
+{{#if toolsContext}}
+TOOLS CONTEXT (for tools_proficiency questions):
+{{toolsContextJson}}
+- If tools confidence is "explicit": Ask deeper, more specific questions about these tools
+- If tools confidence is "company_inferred": Medium depth, focus on common workflows
+- If tools confidence is "role_inferred": Keep questions lighter, focus on transferable concepts
+{{/if}}
+
 FOR EACH QUESTION, PROVIDE:
 
 1. **Type**: The question type (from the mix)
@@ -179,32 +187,67 @@ FOR EACH QUESTION, PROVIDE:
 
 8. **What Great Looks Like**: 1 sentence describing an excellent response
 
+INTENSITY CALIBRATION (CRITICAL):
+Your questions must vary in intensity across the assessment. Real jobs are ~70% routine work, ~20% moderate challenges, ~10% high-stakes situations.
+
+For a {{questionCount}}-question assessment, aim for:
+- 1-2 HIGH intensity questions (major stakeholder conflict, significant revenue at risk, executive escalation)
+- 3-4 MEDIUM intensity questions (competing priorities, challenging conversations, complex analysis)
+- 2-3 LOW intensity questions (routine workflows, normal collaboration, day-to-day tasks)
+
+INTENSITY RULES:
+1. NEVER create scenarios with more than 2 simultaneous crises - real life rarely has 4+ fires at once
+2. Scale stakes to the role level:
+   - Entry/Mid level: Individual contributor stakes ($10K-$100K impact, team-level decisions)
+   - Senior level: Department stakes ($100K-$500K impact, cross-team coordination)
+   - Lead/Executive: Company stakes ($500K+ impact, C-suite involvement)
+3. Include at least 1 "normal day" question that tests routine competence, not crisis response
+4. Avoid piling on stakes (don't combine: executive escalation + biggest account + performance review + alone in the same scenario)
+
+COMPANY CONTEXT INTEGRATION:
+- Use specific {{company.name}} products, features, and terminology in scenarios
+- Reference {{company.competitors}} when relevant for competitive scenarios
+- Incorporate {{company.values}} into stakeholder motivations
+- Use {{company.typicalStakeholders}} as characters in scenarios
+- Make scenarios feel like they could actually happen at THIS company
+
 QUESTION TYPE GUIDANCE:
 
-**crisis_simulation**: Multiple fires at once, test prioritization
-- Include 3-4 competing urgent issues
-- Make some clearly more important than others
-- Force tradeoffs (can't do everything)
+**crisis_simulation**: Competing priorities, test prioritization
+- Include EXACTLY 2 competing urgent issues (not 3-4)
+- Make the tradeoff genuinely difficult - both matter
+- Keep stakes proportional to role level
+- The person should NOT be "alone" handling everything - that's unrealistic
 
 **communication_draft**: Write the actual message
 - Specific recipient with context
-- High-stakes situation (negotiation, bad news, persuasion)
+- VARY the stakes: some high (negotiation, bad news) and some moderate (update, request, follow-up)
 - Include subtle constraints (authority level, relationship history)
+- Use realistic company communication scenarios, not just crisis emails
 
 **strategic_prioritization**: Resource allocation decision
 - Multiple options with pros/cons
 - Fixed constraint (budget, time, headcount)
 - No obviously correct answer
+- Keep scope realistic for role level
 
 **data_interpretation**: Extract insights from metrics
 - Provide realistic data (table or metrics)
 - Include a non-obvious insight to find
 - Ask for both analysis AND recommendation
+- Make numbers proportional to company stage (startup vs enterprise)
 
 **stakeholder_navigation**: Navigate competing interests
-- Two+ stakeholders with valid but conflicting positions
+- Two stakeholders with valid but conflicting positions (not more)
 - Candidate is in the middle
 - No "right" side to take
+- Make the conflict feel like something that actually happens at {{company.name}}
+
+**operational_workflow**: Normal day-to-day tasks (INCLUDE AT LEAST 1)
+- Test routine competence: "Walk through how you'd handle..."
+- Examples: weekly planning, status updates, documentation, process improvement
+- Low/medium stakes but reveals work habits and organizational skills
+- Shows they can do the 80% of the job that isn't crisis management
 
 **reverse_engineering**: Explain success
 - Reference a real or realistic company success
@@ -221,6 +264,14 @@ QUESTION TYPE GUIDANCE:
 - Part 2: Situation changes/escalates
 - Part 3: Reflect on what happened
 - Tests consistency and adaptation
+
+**tools_proficiency**: Test practical tool/system knowledge
+- Focus on tools mentioned in the JD, or common tools for the role
+- Ask HOW to do specific tasks, not just IF they've used the tool
+- Examples: "How would you set up a filtered report in Salesforce?", "What formula would you use in Excel to...", "Walk through creating a dashboard in Looker"
+- Depth scales with confidence: explicit mentions → deeper questions; inferred tools → lighter/more general
+- Senior roles get more complex scenarios; entry-level gets basics
+- Always ask for practical steps, not theoretical knowledge
 
 FORMAT YOUR RESPONSE AS JSON:
 {
@@ -426,7 +477,8 @@ export function buildAssessmentGenerationPrompt(
   questionMix: Record<string, number>,
   difficulty: string,
   estimatedMinutes: number,
-  focusAreas?: string[]
+  focusAreas?: string[],
+  toolsContext?: { tools: string[]; confidence: string; source: string }
 ): string {
   return fillTemplate(ASSESSMENT_GENERATION_PROMPT, {
     company,
@@ -436,6 +488,7 @@ export function buildAssessmentGenerationPrompt(
     difficulty,
     estimatedMinutes,
     focusAreas: focusAreas?.join(', '),
+    toolsContext,
   });
 }
 
