@@ -67,11 +67,14 @@ export async function GET() {
       const resultData = result.result_data as {
         overallScore?: number;
         candidateName?: string;
-      };
-      const assessmentInfo = result.assessments as {
-        company_name: string;
-        role_title: string;
       } | null;
+      
+      // Handle the assessments relation - could be object or array depending on Supabase response
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const assessmentsRaw = result.assessments as any;
+      const assessmentInfo = Array.isArray(assessmentsRaw) 
+        ? assessmentsRaw[0] 
+        : assessmentsRaw;
 
       return {
         id: result.id,
